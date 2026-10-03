@@ -32,6 +32,20 @@ run.bat
 3. 开始识别（每页约 5~60 秒，视分辨率与选项）
 4. 对照校对 → 导出 `.docx`
 
+## 手机端 App
+
+`mobile/` 内含 Android 应用（WebView 壳，零第三方依赖）：
+
+- **自动发现**：电脑端服务注册 mDNS（`_exam2doc._tcp`），App 打开后自动列出局域网内的电脑，点击即连
+- **拍照上传**：调起系统相机/相册，与网页端上传完全一致
+- **保存到手机**：导出 docx 时通过原生桥直接写入手机「下载」目录
+- **应用内更新**：点「检查更新」从电脑局域网下载新 APK 安装（`/api/app-version` 版本比对），
+  版本号以 `mobile/app/build.gradle` 的 `versionName` 为准，与电脑端共用同一份前端
+
+构建 APK：`build_apk.bat`（需先放置 JDK17/Gradle/SDK 到 `tools/`，见脚本内路径），
+产物自动复制到 `work/apk/exam2doc.apk`，手机访问电脑页面或 App 内更新即可安装。
+签名密钥 `keystore/exam2doc.jks` 已 gitignore，请自行备份——签名变了 App 会要求卸载重装。
+
 ## 技术架构
 
 ```
