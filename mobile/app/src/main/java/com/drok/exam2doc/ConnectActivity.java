@@ -270,12 +270,27 @@ public class ConnectActivity extends Activity {
                 cv.clear();
                 cv.put(android.provider.MediaStore.Downloads.IS_PENDING, 0);
                 getContentResolver().update(uri, cv, null, null);
-                runOnUiThread(() -> Toast.makeText(ConnectActivity.this,
-                        "已保存到手机「下载」：" + filename, Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> shareDocx(uri, filename));
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(ConnectActivity.this,
                         "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show());
             }
+        }
+    }
+
+    /** 保存后直接拉起系统分享面板（微信/WPS 等），文件同时保留在下载目录。 */
+    private void shareDocx(Uri uri, String filename) {
+        String mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType(mime);
+        share.putExtra(Intent.EXTRA_STREAM, uri);
+        share.putExtra(Intent.EXTRA_TITLE, filename);
+        share.setClipData(android.content.ClipData.newRawUri(filename, uri));
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(Intent.createChooser(share, "分享试卷 Word"));
+        } catch (Throwable e) {
+            Toast.makeText(this, "已保存到下载目录（无可用的分享应用）", Toast.LENGTH_LONG).show();
         }
     }
 

@@ -144,15 +144,20 @@ public class LocalOcrActivity extends Activity {
         setContentView(root);
     }
 
+    private java.io.File cameraFile;
+
     private void takePhoto() {
-        ContentValues cv = new ContentValues();
-        cv.put(DISPLAY_NAME, "exam2doc_cap.jpg");
-        cv.put(MIME_TYPE, "image/jpeg");
-        cv.put(IS_PENDING, 1);
-        cameraUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
-        Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
         try {
+            java.io.File dir = getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES);
+            if (dir != null && !dir.exists()) dir.mkdirs();
+            cameraFile = new java.io.File(dir, "capture_" + System.currentTimeMillis() + ".jpg");
+            if (cameraFile.exists()) cameraFile.delete();
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", cameraFile);
+            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             startActivityForResult(i, REQ_CAMERA);
         } catch (Exception e) {
             Toast.makeText(this, "无法调起相机：" + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -162,22 +167,54 @@ public class LocalOcrActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK) return;
-        Uri uri = null;
-        if (requestCode == REQ_CAMERA && cameraUri != null) uri = cameraUri;
-        else if (requestCode == REQ_PICK && data != null && data.getData() != null) uri = data.getData();
-        if (uri == null) return;
+        Bitmap bmp = null;
 
-        Bitmap bmp = decodeScaled(uri, 4096);
-        if (requestCode == REQ_CAMERA && cameraUri != null) {
-            // 用完即删，不污染相册
-            try { getContentResolver().delete(cameraUri, null, null); } catch (Exception ignored) { }
+        if (requestCode == REQ_CAMERA) {
+            // 部分相机应用返回 RESULT_CANCELED 但实际已写文件，做兜底
+            if (cameraFile != null && cameraFile.exists() && cameraFile.length() > 0) {
+                bmp = decodeFileScaled(cameraFile, 4096);
+            }
+            if (bmp == null && resultCode == RESULT_OK) {
+                new AlertDialog.Builder(this).setTitle("相机未返回照片")
+                        .setMessage("请重试拍照，或使用「从相册选择」。\n"
+                                + "若反复出现，请反馈此问题。")
+                        .setPositiveButton("知道了", null).show();
+                cameraFile = null;
+                return;
+            }
+            cameraFile = null;
+        } else if (requestCode == REQ_PICK) {
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+            bmp = decodeScaled(data.getData(), 4096);
+        } else {
+            return;
         }
+
         if (bmp == null) {
-            Toast.makeText(this, "图片解码失败（格式不支持或文件损坏）", Toast.LENGTH_LONG).show();
+            new AlertDialog.Builder(this).setTitle("图片解码失败")
+                    .setMessage("格式不支持或文件损坏，请换一张图片试试。")
+                    .setPositiveButton("知道了", null).show();
             return;
         }
         process(bmp);
+    }
+
+    /** 两段式解码（文件路径版）：先读尺寸，按比例采样，避免高像素照片 OOM。 */
+    private Bitmap decodeFileScaled(java.io.File f, int maxSide) {
+        try {
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+            if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+            int sample = 1;
+            while (Math.max(o.outWidth, o.outHeight) / (sample * 2) >= maxSide) sample *= 2;
+            android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+            o2.inSampleSize = sample;
+            o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            return android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o2);
+        } catch (Throwable e) {
+            return null;
+        }
     }
 
     /** 两段式解码：先读尺寸，按比例采样，避免高像素照片 OOM。 */
@@ -294,7 +331,7 @@ public class LocalOcrActivity extends Activity {
         root.addView(resultsBox);
 
         saveBtn = new Button(this);
-        saveBtn.setText("💾 保存 Word 到手机");
+        saveBtn.setText("📤 导出 Word 并分享");
         saveBtn.setTextColor(Color.WHITE);
         saveBtn.setBackgroundColor(0xFF2F6FED);
         saveBtn.setPadding(0, 32, 0, 32);
@@ -315,9 +352,9 @@ public class LocalOcrActivity extends Activity {
     private void saveWord() {
         try {
             byte[] docx = DocxWriter.write(items);
+            String filename = "试卷_" + System.currentTimeMillis() + ".docx";
             ContentValues cv = new ContentValues();
-            cv.put(DISPLAY_NAME,
-                    "试卷_" + System.currentTimeMillis() + ".docx");
+            cv.put(DISPLAY_NAME, filename);
             cv.put(MIME_TYPE,
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
             cv.put(IS_PENDING, 1);
@@ -328,9 +365,27 @@ public class LocalOcrActivity extends Activity {
             cv.clear();
             cv.put(IS_PENDING, 0);
             getContentResolver().update(uri, cv, null, null);
-            Toast.makeText(this, "已保存到手机「下载」目录", Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "导出失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            shareDocx(uri, filename);
+        } catch (Throwable e) {
+            new AlertDialog.Builder(this).setTitle("导出失败")
+                    .setMessage(e.getClass().getSimpleName() + ": " + e.getMessage())
+                    .setPositiveButton("知道了", null).show();
+        }
+    }
+
+    /** 保存后直接拉起系统分享面板（微信/WPS 等都在面板里），文件同时保留在下载目录。 */
+    private void shareDocx(Uri uri, String filename) {
+        String mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType(mime);
+        share.putExtra(Intent.EXTRA_STREAM, uri);
+        share.putExtra(Intent.EXTRA_TITLE, filename);
+        share.setClipData(android.content.ClipData.newRawUri(filename, uri));
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(Intent.createChooser(share, "分享试卷 Word"));
+        } catch (Throwable e) {
+            Toast.makeText(this, "已保存到下载目录（无可用的分享应用）", Toast.LENGTH_LONG).show();
         }
     }
 }
