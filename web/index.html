@@ -213,9 +213,19 @@ $('#export').onclick = async () => {
     });
     if (!r.ok) throw new Error('导出失败');
     const blob = await r.blob();
+    // App 内：通过原生桥保存到手机下载目录；浏览器：触发下载
+    if (window.AndroidBridge && AndroidBridge.saveDocx) {
+      const b64 = await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result.split(',')[1]);
+        fr.readAsDataURL(blob);
+      });
+      AndroidBridge.saveDocx(a_name(), b64);
+      return;
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = '试卷_' + new Date().toISOString().slice(0,10) + '.docx';
+    a.download = a_name();
     a.click();
   } catch (e) { showErr(e); }
   btn.disabled = false; btn.textContent = '导出 Word (.docx)';
@@ -224,6 +234,7 @@ $('#export').onclick = async () => {
 $('#newjob').onclick = () => location.reload();
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function a_name(){ return '试卷_' + new Date().toISOString().slice(0,10) + '.docx'; }
 function showErr(e){ const el = $('#err'); el.textContent = '出错了：' + e.message; el.style.display='block'; }
 function reset(){ $('#go').disabled = files.length === 0; $('#prog').style.display='none'; }
 </script>
