@@ -34,8 +34,7 @@ run.bat
 
 ## 手机端 App
 
-**下载**：[Release v1.1.0](https://github.com/dsb812/exam2doc/releases) 或
-[dist/exam2doc-1.1.0.apk](https://github.com/dsb812/exam2doc/raw/main/dist/exam2doc-1.1.0.apk)
+**下载**：[Release v1.1.0](https://github.com/dsb812/exam2doc/releases/download/v1.1.0/exam2doc-1.1.0.apk)
 （Android 10+，arm64；局域网内也可直接访问电脑端 `http://电脑IP:8484/download/apk` 下载）
 
 `mobile/` 内含 Android 应用（零第三方依赖框架，端上推理用 ONNX Runtime + OpenCV）：
