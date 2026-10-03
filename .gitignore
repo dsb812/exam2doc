@@ -3,11 +3,21 @@
 __pycache__/
 *.pyc
 
-# 运行时缓存（上传图片/页面缓存）
+# 运行时缓存（上传图片/页面缓存/APK 分发）
 work/
 
 # 导出产物
 *.docx
+
+# Android 工具链与构建产物
+tools/
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/local.properties
+
+# 签名密钥（不公开；丢失后需重新生成并重装 App）
+keystore/
 
 # 本地临时文件
 tiny.onnx
