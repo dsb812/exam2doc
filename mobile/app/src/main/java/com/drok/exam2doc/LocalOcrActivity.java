@@ -212,11 +212,13 @@ public class LocalOcrActivity extends Activity {
         new AsyncTask<Bitmap, Void, Object[]>() {
             @Override protected Object[] doInBackground(Bitmap... b) {
                 try {
+                    // 先初始化引擎（含 OpenCV 库加载），再使用任何 OpenCV 对象
+                    OcrPipeline pipe = getPipeline(useNnapi);
                     Bitmap scaled = OcrPipeline.bitmapToBitmap8888(b[0], MAX_SIDE);
                     if (scaled != b[0]) b[0].recycle();
                     Mat mat = new Mat();
                     Utils.bitmapToMat(scaled, mat);
-                    List<OcrPipeline.Item> out = getPipeline(useNnapi).run(mat);
+                    List<OcrPipeline.Item> out = pipe.run(mat);
                     mat.release();
                     return new Object[]{out, null};
                 } catch (Throwable e) {
