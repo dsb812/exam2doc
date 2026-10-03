@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 运行时缓存（上传图片/页面缓存）
+work/
+
+# 导出产物
+*.docx
+
+# 本地临时文件
+tiny.onnx
+*.log
