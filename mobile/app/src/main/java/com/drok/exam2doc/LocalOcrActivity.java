@@ -253,8 +253,13 @@ public class LocalOcrActivity extends Activity {
                     OcrPipeline pipe = getPipeline(useNnapi);
                     Bitmap scaled = OcrPipeline.bitmapToBitmap8888(b[0], MAX_SIDE);
                     if (scaled != b[0]) b[0].recycle();
+                    // bitmapToMat 产出 RGBA 四通道，识别模型需要 BGR 三通道，必须转换
+                    Mat rgba = new Mat();
+                    Utils.bitmapToMat(scaled, rgba);
                     Mat mat = new Mat();
-                    Utils.bitmapToMat(scaled, mat);
+                    org.opencv.imgproc.Imgproc.cvtColor(rgba, mat,
+                            org.opencv.imgproc.Imgproc.COLOR_RGBA2BGR);
+                    rgba.release();
                     List<OcrPipeline.Item> out = pipe.run(mat);
                     mat.release();
                     return new Object[]{out, null};
