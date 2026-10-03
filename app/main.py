@@ -26,6 +26,53 @@ WORK.mkdir(exist_ok=True)
 (WORK / "uploads").mkdir(exist_ok=True)
 (WORK / "pages").mkdir(exist_ok=True)
 
+APK_PATH = WORK / "apk" / "exam2doc.apk"
+
+
+def _app_version() -> str:
+    """从 Android 工程读取 versionName，与 APK 保持一致。"""
+    try:
+        import re
+        gradle = (ROOT / "mobile" / "app" / "build.gradle").read_text(encoding="utf-8")
+        m = re.search(r'versionName\s+"([^"]+)"', gradle)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return "0.0.0"
+
+
+def _start_mdns():
+    """注册 mDNS 服务，手机 App 可自动发现本机。"""
+    try:
+        import socket
+
+        from zeroconf import ServiceInfo, Zeroconf
+
+        zc = Zeroconf()
+        ips = [
+            socket.inet_aton(sa[4][0])
+            for sa in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+            if not sa[4][0].startswith("127.")
+        ]
+        if not ips:
+            return
+        info = ServiceInfo(
+            "_exam2doc._tcp.local.",
+            "exam2doc._exam2doc._tcp.local.",
+            addresses=ips,
+            port=8484,
+            properties={"path": "/"},
+            server="exam2doc.local.",
+        )
+        zc.register_service(info)
+        log.info("mDNS 服务已注册: exam2doc._exam2doc._tcp.local. port=8484")
+    except Exception as e:
+        log.warning("mDNS 注册失败（不影响手动输入地址连接）: %s", e)
+
+
+_start_mdns()
+
 app = FastAPI(title="exam2doc 试卷电子化")
 
 # job_id -> dict(status, pages, crops, error, options)
@@ -184,6 +231,23 @@ async def export_md(job_id: str):
 async def job_delete(job_id: str):
     JOBS.pop(job_id, None)
     return {"ok": True}
+
+
+@app.get("/api/app-version")
+async def app_version():
+    """手机 App 检查更新用：返回最新版本与 APK 下载地址。"""
+    return {"version": _app_version(), "apk": "/download/apk", "has_apk": APK_PATH.exists()}
+
+
+@app.get("/download/apk")
+async def download_apk():
+    if not APK_PATH.exists():
+        raise HTTPException(404, "APK 未部署，请先构建并复制到 work/apk/exam2doc.apk")
+    return FileResponse(
+        str(APK_PATH),
+        media_type="application/vnd.android.package-archive",
+        filename=f"exam2doc-{_app_version()}.apk",
+    )
 
 
 app.mount("/work", StaticFiles(directory=str(WORK)), name="work")
