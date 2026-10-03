@@ -76,8 +76,7 @@ public class OcrPipeline {
             float mid1 = pageW * 0.38f, mid2 = pageW * 0.62f;
             int crossing = 0;
             for (Item it : items)
-                if (minX(it.box) < mid1 && maxX(it.box) > mid2) crossing++;
-            if (crossing <= items.size() * 0.25) {
+                if (minX(it.box) < mid1 && maxX(it.box) > mid2) crossing++;            if (crossing <= items.size() * 0.25) {
                 List<Item> left = new ArrayList<>(), right = new ArrayList<>();
                 for (Item it : items) {
                     if ((minX(it.box) + maxX(it.box)) / 2 <= pageW / 2f) left.add(it);
@@ -105,7 +104,7 @@ public class OcrPipeline {
             float cy = (it.box[1] + it.box[5]) / 2;
             float h = it.box[5] - it.box[1];
             if (!Float.isNaN(rowY) && Math.abs(cy - rowY) > Math.max(h, 18) * 0.7) {
-                row.sort(Comparator.comparingDouble(OcrPipeline::minX));
+                row.sort(Comparator.comparingDouble(q -> minX(q.box)));
                 out.addAll(row);
                 row = new ArrayList<>();
             }
@@ -114,21 +113,21 @@ public class OcrPipeline {
             for (Item r : row) sum += (r.box[1] + r.box[5]) / 2;
             rowY = sum / row.size();
         }
-        row.sort(Comparator.comparingDouble(OcrPipeline::minX));
+        row.sort(Comparator.comparingDouble(q -> minX(q.box)));
         out.addAll(row);
         items.clear();
         items.addAll(out);
     }
 
-    private static float minX(Item it) {
+    private static float minX(float[] box) {
         float m = Float.MAX_VALUE;
-        for (int i = 0; i < 4; i++) m = Math.min(m, it.box[i * 2]);
+        for (int i = 0; i < 4; i++) m = Math.min(m, box[i * 2]);
         return m;
     }
 
-    private static float maxX(Item it) {
+    private static float maxX(float[] box) {
         float m = -Float.MAX_VALUE;
-        for (int i = 0; i < 4; i++) m = Math.max(m, it.box[i * 2]);
+        for (int i = 0; i < 4; i++) m = Math.max(m, box[i * 2]);
         return m;
     }
 

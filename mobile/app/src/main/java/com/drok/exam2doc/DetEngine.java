@@ -61,7 +61,7 @@ public class DetEngine {
              OrtSession.Result res = session.run(Collections.singletonMap("x", t))) {
 
             Object obj = res.get(0).getValue();
-            float[][][] prob;   // [H][W] prob map
+            float[][] prob;   // [H][W] prob map
             if (obj instanceof float[][][][] f4) prob = f4[0][0];
             else if (obj instanceof float[][][] f3) prob = f3[0];
             else throw new IllegalStateException("det output shape unexpected");

@@ -18,7 +18,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.opencv.OpenCVLoader;
+import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 
@@ -27,6 +27,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import static android.provider.MediaStore.MediaColumns.DISPLAY_NAME;
+import static android.provider.MediaStore.MediaColumns.IS_PENDING;
+import static android.provider.MediaStore.MediaColumns.MIME_TYPE;
 
 /** 本机识别：照片在手机上直接完成 OCR（PP-OCRv6 ONNX），可校对后保存 Word。 */
 public class LocalOcrActivity extends Activity {
@@ -123,10 +127,10 @@ public class LocalOcrActivity extends Activity {
 
     private void takePhoto() {
         ContentValues cv = new ContentValues();
-        cv.put(MediaStore.Images.DISPLAY_NAME, "exam2doc_cap.jpg");
-        cv.put(MediaStore.Images.MIME_TYPE, "image/jpeg");
-        cv.put(MediaStore.Images.IS_PENDING, 1);
-        cameraUri = getContentResolver().insert(MediaStore.Images.EXTERNAL_CONTENT_URI, cv);
+        cv.put(DISPLAY_NAME, "exam2doc_cap.jpg");
+        cv.put(MIME_TYPE, "image/jpeg");
+        cv.put(IS_PENDING, 1);
+        cameraUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
         Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
         try {
@@ -264,17 +268,17 @@ public class LocalOcrActivity extends Activity {
         try {
             byte[] docx = DocxWriter.write(items);
             ContentValues cv = new ContentValues();
-            cv.put(MediaStore.Downloads.DISPLAY_NAME,
+            cv.put(DISPLAY_NAME,
                     "试卷_" + System.currentTimeMillis() + ".docx");
-            cv.put(MediaStore.Downloads.MIME_TYPE,
+            cv.put(MIME_TYPE,
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            cv.put(MediaStore.Downloads.IS_PENDING, 1);
+            cv.put(IS_PENDING, 1);
             Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
             OutputStream os = getContentResolver().openOutputStream(uri);
             os.write(docx);
             os.close();
             cv.clear();
-            cv.put(MediaStore.Downloads.IS_PENDING, 0);
+            cv.put(IS_PENDING, 0);
             getContentResolver().update(uri, cv, null, null);
             Toast.makeText(this, "已保存到手机「下载」目录", Toast.LENGTH_LONG).show();
         } catch (Exception e) {

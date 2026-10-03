@@ -138,7 +138,7 @@ public class ConnectActivity extends Activity {
                         runOnUiThread(() -> {
                             if (!found.add(addr)) return;
                             discoverStatus.setText("找到电脑：");
-                            Button b = new Button(MainActivity.this);
+                            Button b = new Button(ConnectActivity.this);
                             b.setText(addr);
                             b.setTextColor(Color.WHITE);
                             b.setBackgroundColor(Color.parseColor("#18a058"));
@@ -270,10 +270,10 @@ public class ConnectActivity extends Activity {
                 cv.clear();
                 cv.put(android.provider.MediaStore.Downloads.IS_PENDING, 0);
                 getContentResolver().update(uri, cv, null, null);
-                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                runOnUiThread(() -> Toast.makeText(ConnectActivity.this,
                         "已保存到手机「下载」：" + filename, Toast.LENGTH_LONG).show());
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                runOnUiThread(() -> Toast.makeText(ConnectActivity.this,
                         "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show());
             }
         }
@@ -306,12 +306,12 @@ public class ConnectActivity extends Activity {
             }
             @Override protected void onPostExecute(String[] r) {
                 if (r == null) {
-                    Toast.makeText(MainActivity.this, "无法连接电脑，请确认电脑端已启动",
+                    Toast.makeText(ConnectActivity.this, "无法连接电脑，请确认电脑端已启动",
                             Toast.LENGTH_LONG).show();
                     return;
                 }
                 if (isNewer(r[0], BuildConfig.VERSION_NAME)) {
-                    new AlertDialog.Builder(MainActivity.this)
+                    new AlertDialog.Builder(ConnectActivity.this)
                             .setTitle("发现新版本 " + r[0])
                             .setMessage("当前版本 " + BuildConfig.VERSION_NAME
                                     + "，是否从电脑下载并安装？")
@@ -319,7 +319,7 @@ public class ConnectActivity extends Activity {
                                     downloadApk(addr + r[1]))
                             .setNegativeButton("取消", null).show();
                 } else {
-                    Toast.makeText(MainActivity.this, "已是最新版本 " + BuildConfig.VERSION_NAME,
+                    Toast.makeText(ConnectActivity.this, "已是最新版本 " + BuildConfig.VERSION_NAME,
                             Toast.LENGTH_SHORT).show();
                 }
             }
@@ -362,7 +362,7 @@ public class ConnectActivity extends Activity {
             }
             @Override protected void onPostExecute(Uri uri) {
                 if (uri == null) {
-                    Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_LONG).show();
+                    Toast.makeText(ConnectActivity.this, "下载失败", Toast.LENGTH_LONG).show();
                     return;
                 }
                 Intent i = new Intent(Intent.ACTION_VIEW);
@@ -371,7 +371,7 @@ public class ConnectActivity extends Activity {
                 try {
                     startActivity(i);
                 } catch (Exception e) {
-                    Toast.makeText(MainActivity.this,
+                    Toast.makeText(ConnectActivity.this,
                             "已下载到「下载」目录，请手动安装", Toast.LENGTH_LONG).show();
                 }
             }

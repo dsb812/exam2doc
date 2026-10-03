@@ -50,7 +50,7 @@ public class RecEngine {
         Mat crop = cropBox(bgr, box);
         Mat resized = new Mat();
         Size cs = crop.size();
-        float ratio = (float) cs.width / cs.height;
+        float ratio = (float) (cs.width / cs.height);
         if (ratio * IMG_H >= IMG_W) {
             Imgproc.resize(crop, resized, new Size(IMG_W, IMG_H));
         } else {
