@@ -34,7 +34,11 @@ run.bat
 
 ## 手机端 App
 
-`mobile/` 内含 Android 应用（WebView 壳，零第三方依赖）：
+**下载**：[Release v1.1.0](https://github.com/dsb812/exam2doc/releases) 或
+[dist/exam2doc-1.1.0.apk](https://github.com/dsb812/exam2doc/raw/main/dist/exam2doc-1.1.0.apk)
+（Android 10+，arm64；局域网内也可直接访问电脑端 `http://电脑IP:8484/download/apk` 下载）
+
+`mobile/` 内含 Android 应用（零第三方依赖框架，端上推理用 ONNX Runtime + OpenCV）：
 
 - **自动发现**：电脑端服务注册 mDNS（`_exam2doc._tcp`），App 打开后自动列出局域网内的电脑，点击即连
 - **拍照上传**：调起系统相机/相册，与网页端上传完全一致
