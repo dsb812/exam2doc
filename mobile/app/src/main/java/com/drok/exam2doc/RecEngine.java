@@ -33,9 +33,9 @@ public class RecEngine {
         public Result(String text, float score) { this.text = text; this.score = score; }
     }
 
-    RecEngine(OrtEnvironment env, byte[] model) throws Exception {
+    RecEngine(OrtEnvironment env, byte[] model, boolean useNnapi) throws Exception {
         this.env = env;
-        session = OrtSessions.create(env, model);
+        session = OrtSessions.create(env, model, useNnapi);
         Map<String, String> meta = session.getMetadata().getCustomMetadata();
         String chars = meta.get("character");
         if (chars == null) throw new IllegalStateException("模型元数据缺少 character 字典");

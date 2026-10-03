@@ -1,6 +1,7 @@
 package com.drok.exam2doc;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -43,17 +44,23 @@ public class LocalOcrActivity extends Activity {
     private LinearLayout resultsBox;
     private Button saveBtn, againBtn;
     private List<OcrPipeline.Item> items;
+    private android.widget.CheckBox gpuToggle;
 
     // 引擎懒加载单例
     private static OcrPipeline pipeline;
+    private static boolean pipelineNnapi;
 
-    private static synchronized OcrPipeline getPipeline() throws Exception {
-        if (pipeline == null) {
-            OpenCVLoader.initLocal();
+    private static synchronized OcrPipeline getPipeline(boolean useNnapi) throws Throwable {
+        if (pipeline == null || pipelineNnapi != useNnapi) {
+            if (!OpenCVLoader.initLocal()) {
+                throw new IllegalStateException("OpenCV 原生库加载失败，请反馈此问题");
+            }
             ai.onnxruntime.OrtEnvironment env = ai.onnxruntime.OrtEnvironment.getEnvironment();
             byte[] det = readAsset("PP-OCRv6_det_small.onnx");
             byte[] rec = readAsset("PP-OCRv6_rec_small.onnx");
-            pipeline = new OcrPipeline(new DetEngine(env, det), new RecEngine(env, rec));
+            pipeline = new OcrPipeline(new DetEngine(env, det, useNnapi),
+                    new RecEngine(env, rec, useNnapi));
+            pipelineNnapi = useNnapi;
         }
         return pipeline;
     }
@@ -122,6 +129,18 @@ public class LocalOcrActivity extends Activity {
         });
         root.addView(pick);
 
+        gpuToggle = new android.widget.CheckBox(this);
+        gpuToggle.setText("GPU/NPU 加速（实验性：若识别闪退请保持关闭）");
+        gpuToggle.setTextSize(13);
+        gpuToggle.setTextColor(0xFF6B7280);
+        gpuToggle.setChecked(getSharedPreferences("exam2doc", MODE_PRIVATE)
+                .getBoolean("nnapi", false));
+        gpuToggle.setPadding(0, 24, 0, 0);
+        gpuToggle.setOnCheckedChangeListener((b, c) ->
+                getSharedPreferences("exam2doc", MODE_PRIVATE)
+                        .edit().putBoolean("nnapi", c).apply());
+        root.addView(gpuToggle);
+
         setContentView(root);
     }
 
@@ -149,29 +168,47 @@ public class LocalOcrActivity extends Activity {
         else if (requestCode == REQ_PICK && data != null && data.getData() != null) uri = data.getData();
         if (uri == null) return;
 
-        Bitmap bmp;
-        try (InputStream in = getContentResolver().openInputStream(uri)) {
-            bmp = android.graphics.BitmapFactory.decodeStream(in);
-        } catch (Exception e) {
-            Toast.makeText(this, "读取图片失败", Toast.LENGTH_LONG).show();
-            return;
-        }
+        Bitmap bmp = decodeScaled(uri, 4096);
         if (requestCode == REQ_CAMERA && cameraUri != null) {
             // 用完即删，不污染相册
             try { getContentResolver().delete(cameraUri, null, null); } catch (Exception ignored) { }
         }
         if (bmp == null) {
-            Toast.makeText(this, "图片解码失败", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "图片解码失败（格式不支持或文件损坏）", Toast.LENGTH_LONG).show();
             return;
         }
         process(bmp);
     }
 
+    /** 两段式解码：先读尺寸，按比例采样，避免高像素照片 OOM。 */
+    private Bitmap decodeScaled(Uri uri, int maxSide) {
+        try {
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                android.graphics.BitmapFactory.decodeStream(in, null, o);
+            }
+            if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+            int sample = 1;
+            while (Math.max(o.outWidth, o.outHeight) / (sample * 2) >= maxSide) sample *= 2;
+            android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+            o2.inSampleSize = sample;
+            o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                return android.graphics.BitmapFactory.decodeStream(in, null, o2);
+            }
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
     private void process(Bitmap bmp) {
         ProgressDialog dlg = new ProgressDialog(this);
-        dlg.setMessage("识别中…（手机 CPU 推理，约 10~40 秒）");
+        dlg.setMessage("识别中…（首次需加载模型，约 5~40 秒）");
         dlg.setCancelable(false);
         dlg.show();
+        final boolean useNnapi = getSharedPreferences("exam2doc", MODE_PRIVATE)
+                .getBoolean("nnapi", false);
         new AsyncTask<Bitmap, Void, Object[]>() {
             @Override protected Object[] doInBackground(Bitmap... b) {
                 try {
@@ -179,19 +216,28 @@ public class LocalOcrActivity extends Activity {
                     if (scaled != b[0]) b[0].recycle();
                     Mat mat = new Mat();
                     Utils.bitmapToMat(scaled, mat);
-                    List<OcrPipeline.Item> out = getPipeline().run(mat);
+                    List<OcrPipeline.Item> out = getPipeline(useNnapi).run(mat);
                     mat.release();
                     return new Object[]{out, null};
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     return new Object[]{null, e};
                 }
             }
             @Override protected void onPostExecute(Object[] r) {
                 dlg.dismiss();
-                Exception e = (Exception) r[1];
+                Throwable e = (Throwable) r[1];
                 if (e != null) {
-                    Toast.makeText(LocalOcrActivity.this, "识别失败：" + e.getMessage(),
-                            Toast.LENGTH_LONG).show();
+                    // 完整错误可视化，便于远程诊断
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(e.getClass().getName()).append(": ").append(e.getMessage()).append('\n');
+                    StackTraceElement[] st = e.getStackTrace();
+                    for (int i = 0; i < Math.min(6, st.length); i++)
+                        sb.append("  at ").append(st[i]).append('\n');
+                    new AlertDialog.Builder(LocalOcrActivity.this)
+                            .setTitle("识别失败")
+                            .setMessage(sb.toString())
+                            .setPositiveButton("知道了", null)
+                            .show();
                     return;
                 }
                 @SuppressWarnings("unchecked")

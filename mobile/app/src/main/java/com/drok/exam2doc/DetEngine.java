@@ -34,9 +34,9 @@ public class DetEngine {
     private final OrtEnvironment env;
     private final OrtSession session;
 
-    DetEngine(OrtEnvironment env, byte[] model) throws Exception {
+    DetEngine(OrtEnvironment env, byte[] model, boolean useNnapi) throws Exception {
         this.env = env;
-        session = OrtSessions.create(env, model);
+        session = OrtSessions.create(env, model, useNnapi);
     }
 
     public void close() throws Exception { session.close(); }
