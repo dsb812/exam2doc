@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>试卷电子化 · exam2doc</title>
+<style>
+  :root { --pri:#2f6fed; --bg:#f5f7fa; --card:#fff; --bd:#e3e8ef; --tx:#1f2937; --muted:#6b7280; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:var(--tx); }
+  header { background:var(--pri); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:18px; font-weight:600; }
+  header span { font-size:12px; opacity:.85; }
+  main { max-width:1280px; margin:0 auto; padding:20px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .drop { border:2px dashed #b6c4e0; border-radius:12px; padding:36px 20px; text-align:center; cursor:pointer; transition:.15s; }
+  .drop.hover, .drop:hover { border-color:var(--pri); background:#f0f5ff; }
+  .drop p { color:var(--muted); margin-top:8px; font-size:14px; }
+  .drop .big { font-size:16px; color:var(--tx); font-weight:600; }
+  .opts { display:flex; flex-wrap:wrap; gap:14px; margin-top:16px; font-size:14px; }
+  .opts label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .opts .group { display:flex; align-items:center; gap:4px; }
+  fieldset { border:none; }
+  legend { font-weight:600; font-size:13px; margin-bottom:4px; }
+  button { background:var(--pri); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:15px; cursor:pointer; }
+  button:disabled { background:#a9bcdc; cursor:not-allowed; }
+  button.ghost { background:#fff; color:var(--pri); border:1px solid var(--pri); }
+  .progress { margin-top:14px; display:none; }
+  .bar { height:8px; background:#e8edf5; border-radius:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--pri); transition:width .4s; }
+  .ptext { font-size:13px; color:var(--muted); margin-top:6px; }
+  .pages { display:none; }
+  .page { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  @media (max-width:900px){ .page { grid-template-columns:1fr; } }
+  .pane { border:1px solid var(--bd); border-radius:10px; overflow:hidden; }
+  .pane h3 { font-size:13px; font-weight:600; color:var(--muted); padding:8px 12px; background:#f8fafc; border-bottom:1px solid var(--bd); }
+  .pane .imgwrap { max-height:70vh; overflow:auto; text-align:center; background:#fafbfd; }
+  .pane img { max-width:100%; }
+  .blocks { max-height:70vh; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:8px; }
+  .blk { border:1px solid var(--bd); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.7; }
+  .blk.text textarea { width:100%; border:none; resize:vertical; font:inherit; background:transparent; outline:none; }
+  .blk.table .thtml { overflow:auto; }
+  .blk table { border-collapse:collapse; font-size:13px; }
+  .blk td, .blk th { border:1px solid #9db2d0; padding:4px 8px; }
+  .blk.formula { font-family:"Cambria Math","Times New Roman",serif; background:#f6f8ff; }
+  .blk.formula textarea { font-family:inherit; }
+  .blk .ktag { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .blk.image img { max-width:100%; border:1px solid var(--bd); border-radius:6px; }
+  .toolbar { display:flex; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap; }
+  .err { color:#c0392b; font-size:14px; margin-top:10px; display:none; }
+  .hint { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>📄 试卷电子化</h1>
+  <span>拍照 → 文字/表格/公式/插图 → 可编辑 Word ｜ 全程本地处理</span>
+</header>
+<main>
+  <div class="card">
+    <div class="drop" id="drop">
+      <div class="big">点击选择 / 拖拽照片到此处</div>
+      <p>支持多张试卷照片（JPG/PNG），手机可用系统相机拍后上传</p>
+      <input type="file" id="file" accept="image/*" multiple hidden>
+    </div>
+    <fieldset class="opts">
+      <legend>识别选项</legend>
+      <label><input type="checkbox" id="perspective" checked> 透视矫正</label>
+      <label><input type="checkbox" id="shadow" checked> 去阴影</label>
+      <label><input type="checkbox" id="tables" checked> 表格识别</label>
+      <label><input type="checkbox" id="formulas" checked> 公式识别</label>
+      <label><input type="checkbox" id="figures" checked> 插图保留</label>
+    </fieldset>
+    <fieldset class="opts">
+      <legend>手写擦除（还原空白卷）</legend>
+      <label><input type="checkbox" id="c_red"> 红笔批注</label>
+      <label><input type="checkbox" id="c_blue"> 蓝笔</label>
+      <label><input type="checkbox" id="c_green"> 绿笔</label>
+      <label><input type="checkbox" id="pencil"> 铅笔（浅灰）</label>
+      <label><input type="checkbox" id="thinink"> 细黑笔迹（黑笔填空，慎用）</label>
+    </fieldset>
+    <div class="toolbar">
+      <button id="go" disabled>开始识别</button>
+      <span class="hint">识别在本机 CPU 上进行，每页约 20~90 秒，请耐心等待</span>
+    </div>
+    <div class="progress" id="prog">
+      <div class="bar"><i id="barfill"></i></div>
+      <div class="ptext" id="ptext"></div>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="pages card" id="resultCard">
+    <div class="toolbar" style="margin:0 0 6px">
+      <button id="export">导出 Word (.docx)</button>
+      <button class="ghost" id="newjob">新建任务</button>
+      <span class="hint">在右侧直接修改文字/公式后导出，修改会一并写入 Word</span>
+    </div>
+    <div id="pages"></div>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let files = [], jobId = null, timer = null;
+
+const drop = $('#drop'), fileInput = $('#file');
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('hover'); };
+drop.ondragleave = () => drop.classList.remove('hover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('hover'); addFiles(e.dataTransfer.files); };
+fileInput.onchange = () => addFiles(fileInput.files);
+function addFiles(list){
+  for (const f of list) if (f.type.startsWith('image/')) files.push(f);
+  $('#go').disabled = files.length === 0;
+  drop.querySelector('.big').textContent = `已选 ${files.length} 张照片，点击可继续添加`;
+}
+
+$('#go').onclick = async () => {
+  if (!files.length) return;
+  $('#go').disabled = true; $('#err').style.display='none';
+  $('#prog').style.display = 'block'; $('#ptext').textContent = '上传中…';
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f));
+  fd.append('perspective', $('#perspective').checked);
+  fd.append('shadow', $('#shadow').checked);
+  fd.append('tables', $('#tables').checked);
+  fd.append('formulas', $('#formulas').checked);
+  fd.append('figures', $('#figures').checked);
+  const colors = [];
+  if ($('#c_red').checked) colors.push('red');
+  if ($('#c_blue').checked) colors.push('blue');
+  if ($('#c_green').checked) colors.push('green');
+  fd.append('erase_colors', colors.join(','));
+  fd.append('erase_pencil', $('#pencil').checked);
+  fd.append('erase_thin_ink', $('#thinink').checked);
+  try {
+    const r = await fetch('/api/upload', { method:'POST', body: fd });
+    if (!r.ok) throw new Error('上传失败 ' + r.status);
+    const j = await r.json();
+    jobId = j.job_id;
+    $('#ptext').textContent = '识别中…';
+    timer = setInterval(poll, 2500);
+  } catch (e) { showErr(e); reset(); }
+};
+
+async function poll(){
+  try {
+    const r = await fetch('/api/job/' + jobId);
+    const j = await r.json();
+    $('#barfill').style.width = (j.done / j.total * 100) + '%';
+    $('#ptext').textContent = `已完成 ${j.done}/${j.total} 页`;
+    if (j.status === 'error') throw new Error(j.error || '识别失败');
+    if (j.status === 'done') { clearInterval(timer); render(j.pages); }
+  } catch (e) { clearInterval(timer); showErr(e); reset(); }
+}
+
+const KIND_NAME = { text:'文字', table:'表格', formula:'公式', image:'插图' };
+function render(pages){
+  const wrap = $('#pages'); wrap.innerHTML = '';
+  pages.forEach((page, pi) => {
+    const div = document.createElement('div');
+    div.innerHTML = `<h3 style="margin:14px 0 6px">第 ${pi+1} 页 · 识别耗时 ${page.elapsed}s</h3>
+      <div class="page">
+        <div class="pane"><h3>原图</h3><div class="imgwrap"><img src="${page.image}"></div></div>
+        <div class="pane"><h3>识别结果（可直接修改）</h3><div class="blocks"></div></div>
+      </div>`;
+    const blocks = div.querySelector('.blocks');
+    page.lines.forEach((l, li) => {
+      const b = document.createElement('div');
+      if (l.kind === 'table' && l.html) {
+        b.className = 'blk table';
+        b.innerHTML = `<div class="ktag">表格</div><div class="thtml" contenteditable="true">${l.html}</div>`;
+      } else if (l.kind === 'formula') {
+        b.className = 'blk formula';
+        b.innerHTML = `<div class="ktag">公式 (LaTeX)</div><textarea rows="2">${esc(l.latex || l.text)}</textarea>`;
+      } else if (l.kind === 'image') {
+        b.className = 'blk image';
+        b.innerHTML = `<div class="ktag">插图（导出时插入 Word）</div>`;
+      } else {
+        b.className = 'blk text';
+        b.innerHTML = `<textarea rows="1">${esc(l.text)}</textarea>`;
+      }
+      b.dataset.kind = l.kind;
+      blocks.appendChild(b);
+    });
+    wrap.appendChild(div);
+  });
+  $('#resultCard').style.display = 'block';
+  // 自动增高文本框
+  document.querySelectorAll('.blk textarea').forEach(t => {
+    const fit = () => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+    t.addEventListener('input', fit); fit();
+  });
+  $('#prog').style.display = 'none';
+  window.scrollTo({ top: $('#resultCard').offsetTop - 20, behavior: 'smooth' });
+}
+
+$('#export').onclick = async () => {
+  const pages = [...document.querySelectorAll('#pages > div')].map((div, pi) => ({
+    index: pi,
+    lines: [...div.querySelectorAll('.blk')].map(b => {
+      const kind = b.dataset.kind;
+      if (kind === 'table') return { kind, html: b.querySelector('.thtml').innerHTML };
+      if (kind === 'formula') return { kind, latex: b.querySelector('textarea').value };
+      if (kind === 'image') return { kind, text: '[插图]' };
+      return { kind:'text', text: b.querySelector('textarea').value };
+    })
+  }));
+  const btn = $('#export'); btn.disabled = true; btn.textContent = '生成中…';
+  try {
+    const r = await fetch('/api/export/' + jobId, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pages)
+    });
+    if (!r.ok) throw new Error('导出失败');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '试卷_' + new Date().toISOString().slice(0,10) + '.docx';
+    a.click();
+  } catch (e) { showErr(e); }
+  btn.disabled = false; btn.textContent = '导出 Word (.docx)';
+};
+
+$('#newjob').onclick = () => location.reload();
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showErr(e){ const el = $('#err'); el.textContent = '出错了：' + e.message; el.style.display='block'; }
+function reset(){ $('#go').disabled = files.length === 0; $('#prog').style.display='none'; }
+</script>
+</body>
+</html>
