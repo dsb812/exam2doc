@@ -19,6 +19,13 @@ public class App extends Application {
         } catch (Throwable t) {
             opencvReady = false;
         }
+        // v1.1.2 一次性重置：让所有用户先回到稳定 CPU 模式，验证基础流程后再手动开 GPU
+        android.content.SharedPreferences p =
+                getSharedPreferences("exam2doc", MODE_PRIVATE);
+        if (!p.getBoolean("nnapi_reset_112", false)) {
+            p.edit().putBoolean("nnapi", false)
+                    .putBoolean("nnapi_reset_112", true).apply();
+        }
     }
 
     public static Context context() {
