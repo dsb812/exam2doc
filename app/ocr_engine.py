@@ -189,12 +189,19 @@ def looks_like_math(text: str) -> bool:
 _frac_like = re.compile(r"[a-zA-Z0-9]\s*[+-]\s*[a-zA-Z0-9]|\\frac|\\sqrt|\^\{|_\{")
 
 
+_latex_engine_inst = None
+
+
 def latex_engine():
-    """懒加载 LaTeX 公式识别（可选，模型需已下载）。"""
+    """懒加载 LaTeX 公式识别（可选，模型需已下载；单例缓存避免重复初始化）。"""
+    global _latex_engine_inst
+    if _latex_engine_inst is not None:
+        return _latex_engine_inst
     try:
         from rapid_latex_ocr import LaTeXOCR
 
-        return LaTeXOCR()
+        _latex_engine_inst = LaTeXOCR()
+        return _latex_engine_inst
     except Exception as e:
         log.warning("latex engine unavailable: %s", e)
         return None

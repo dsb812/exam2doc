@@ -22,3 +22,5 @@ keystore/
 # 本地临时文件
 tiny.onnx
 *.log
+# 本地构建日志
+mobile/build_out*.txt
